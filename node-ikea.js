@@ -192,6 +192,15 @@ module.exports = function (RED) {
             try {
                 let client = new ikea.TradfriClient(node.address,{"customLogger":loggerFunction,"watchConnection":true});
 
+                // node-tradfri-client reports some failures (e.g. a network stack reset while
+                // requests are pending) as "error" events instead of rejected promises. Without
+                // a listener, Node.js turns the event into an uncaught exception and Node-RED exits.
+                // The connection watcher reconnects by itself, so logging the error is enough.
+                client.on("error", (e) => {
+                    let code = e && e.code != null ? ikea.TradfriErrorCodes[e.code] : undefined;
+                    RED.log.warn(`[IKEA: ${node.id}] ${code ? code + ": " : ""}${e && e.message ? e.message : e}`);
+                });
+
                 if (node.identity == null && node.psk == null) {
                     try {
                         const { identity, psk } = yield client.authenticate(node.securityCode);
